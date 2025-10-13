@@ -248,6 +248,8 @@ function showExportModal() {
     modal.style.display = 'flex';
 }
 
+// ... (keep all the existing code until the showImportModal function)
+
 // Show import modal
 function showImportModal() {
     const modal = document.getElementById('exportImportModal');
@@ -259,9 +261,102 @@ function showImportModal() {
     modalTitle.textContent = 'Import Servers';
     exportData.value = '';
     exportData.placeholder = 'Paste your server data here...';
+    exportData.readOnly = false; // Make it editable
     importActions.style.display = 'flex';
     copyBtn.style.display = 'none';
     modal.style.display = 'flex';
+    
+    // Focus on the textarea immediately
+    setTimeout(() => {
+        exportData.focus();
+    }, 100);
+}
+
+// ... (keep the rest of the existing code)
+
+// Replace all servers with imported data
+function replaceServers() {
+    const exportData = document.getElementById('exportData');
+    try {
+        const importedServers = JSON.parse(exportData.value);
+        if (Array.isArray(importedServers)) {
+            // Ensure all imported servers have proper structure
+            const validatedServers = importedServers.map(server => {
+                return {
+                    id: server.id || Date.now() + Math.random(),
+                    name: server.name || 'Unnamed Server',
+                    address: server.address || '',
+                    category: server.category || 'others',
+                    type: server.type || 'bdix',
+                    status: server.status || 'active',
+                    description: server.description || '',
+                    rank: server.rank || servers.length + 1,
+                    createdAt: server.createdAt || Date.now()
+                };
+            });
+            
+            servers = validatedServers;
+            saveServers();
+            renderServers(currentCategory, currentSort);
+            closeModal();
+            showToast('All servers replaced successfully!');
+        } else {
+            showToast('Invalid server data format!', 'error');
+        }
+    } catch (e) {
+        showToast('Invalid JSON data! Please check your server data.', 'error');
+        console.error('Import error:', e);
+    }
+}
+
+// Merge imported data with existing servers
+function mergeServers() {
+    const exportData = document.getElementById('exportData');
+    try {
+        const importedServers = JSON.parse(exportData.value);
+        if (Array.isArray(importedServers)) {
+            // Create a map to avoid duplicates by address
+            const serverMap = new Map();
+            
+            // Add existing servers
+            servers.forEach(server => {
+                serverMap.set(server.address, server);
+            });
+            
+            // Add imported servers (overwriting duplicates by address)
+            importedServers.forEach(server => {
+                const validatedServer = {
+                    id: server.id || Date.now() + Math.random(),
+                    name: server.name || 'Unnamed Server',
+                    address: server.address || '',
+                    category: server.category || 'others',
+                    type: server.type || 'bdix',
+                    status: server.status || 'active',
+                    description: server.description || '',
+                    rank: server.rank || servers.length + 1,
+                    createdAt: server.createdAt || Date.now()
+                };
+                serverMap.set(validatedServer.address, validatedServer);
+            });
+            
+            servers = Array.from(serverMap.values());
+            
+            // Reassign ranks to ensure they're sequential
+            servers.forEach((server, index) => {
+                server.rank = index + 1;
+            });
+            
+            saveServers();
+            renderServers(currentCategory, currentSort);
+            closeModal();
+            showToast('Servers merged successfully!');
+        } else {
+            showToast('Invalid server data format!', 'error');
+        }
+    } catch (e) {
+        showToast('Invalid JSON data! Please check your server data.', 'error');
+        console.error('Merge error:', e);
+    }
 }
 
 // Close modal
