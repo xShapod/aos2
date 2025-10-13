@@ -16,6 +16,9 @@
                     <h1>ISP Media Hub</h1>
                 </div>
                 <div class="header-actions">
+                    <button class="btn btn-info" id="diagnosticsBtn">
+                        <i class="fas fa-heartbeat"></i> Diagnostics
+                    </button>
                     <button class="btn btn-info" id="settingsBtn">
                         <i class="fas fa-cog"></i> Settings
                     </button>
@@ -32,7 +35,26 @@
             <img src="https://i.ibb.co/MyNgy0pF/1760299817553.png" alt="ISP Media Hub Banner">
         </div>
         
-        <!-- ADD BACK THE SORT OPTIONS -->
+        <!-- Quick Stats -->
+        <div class="quick-stats" id="quickStats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalServers">0</div>
+                <div class="stat-label">Total Servers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="favoriteServers">0</div>
+                <div class="stat-label">Favorites</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="activeServers">0</div>
+                <div class="stat-label">Active</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="recentServers">0</div>
+                <div class="stat-label">Recent</div>
+            </div>
+        </div>
+        
         <div class="sort-options">
             <button class="sort-btn active" data-sort="manual">
                 <i class="fas fa-sort"></i> Manual Order
@@ -43,28 +65,50 @@
             <button class="sort-btn" data-sort="recent">
                 <i class="fas fa-clock"></i> Recently Added
             </button>
+            <button class="sort-btn" data-sort="usage">
+                <i class="fas fa-chart-line"></i> Most Used
+            </button>
         </div>
         
         <div class="category-tabs">
             <div class="tab active" data-category="all">
-                <i class="fas fa-globe"></i>
-                All Servers
+                <i class="fas fa-globe"></i> All Servers
+            </div>
+            <div class="tab" data-category="favorites">
+                <i class="fas fa-star"></i> Favorites
+            </div>
+            <div class="tab" data-category="recent">
+                <i class="fas fa-history"></i> Recently Used
             </div>
             <div class="tab" data-category="live">
-                <i class="fas fa-tv"></i>
-                Live TV
+                <i class="fas fa-tv"></i> Live TV
             </div>
             <div class="tab" data-category="movies">
-                <i class="fas fa-film"></i>
-                Movies
+                <i class="fas fa-film"></i> Movies
             </div>
             <div class="tab" data-category="series">
-                <i class="fas fa-play-circle"></i>
-                Series
+                <i class="fas fa-play-circle"></i> Series
             </div>
             <div class="tab" data-category="others">
-                <i class="fas fa-folder"></i>
-                Others
+                <i class="fas fa-folder"></i> Others
+            </div>
+        </div>
+
+        <!-- Bulk Actions -->
+        <div class="bulk-actions" id="bulkActions" style="display: none;">
+            <div class="bulk-header">
+                <span id="selectedCount">0 servers selected</span>
+                <div class="bulk-buttons">
+                    <button class="btn btn-warning" id="bulkFavorite">
+                        <i class="fas fa-star"></i> Favorite
+                    </button>
+                    <button class="btn btn-danger" id="bulkDelete">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                    <button class="btn btn-secondary" id="bulkCancel">
+                        Cancel
+                    </button>
+                </div>
             </div>
         </div>
         
@@ -87,13 +131,8 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="serverCategory">Category</label>
-                        <select class="form-control" id="serverCategory" required>
-                            <option value="live">Live TV</option>
-                            <option value="movies">Movies</option>
-                            <option value="series">Series</option>
-                            <option value="others">Others</option>
-                        </select>
+                        <label for="serverTags">Tags (comma separated)</label>
+                        <input type="text" class="form-control" id="serverTags" placeholder="live, sports, hd">
                     </div>
                     <div class="form-group">
                         <label for="serverType">Server Type</label>
@@ -107,10 +146,30 @@
                     <label for="serverDescription">Description (Optional)</label>
                     <input type="text" class="form-control" id="serverDescription">
                 </div>
+                <div class="form-group">
+                    <label for="serverNotes">Personal Notes (Optional)</label>
+                    <textarea class="form-control" id="serverNotes" rows="2" placeholder="Add your personal notes..."></textarea>
+                </div>
                 <button type="submit" class="btn btn-success">
                     <i class="fas fa-save"></i> Add Server
                 </button>
             </form>
+            
+            <!-- Server Templates -->
+            <div class="templates-section">
+                <h4><i class="fas fa-layer-group"></i> Quick Templates</h4>
+                <div class="template-buttons">
+                    <button class="btn btn-outline template-btn" data-template="live-tv">
+                        <i class="fas fa-tv"></i> Live TV Template
+                    </button>
+                    <button class="btn btn-outline template-btn" data-template="movies">
+                        <i class="fas fa-film"></i> Movies Template
+                    </button>
+                    <button class="btn btn-outline template-btn" data-template="series">
+                        <i class="fas fa-play-circle"></i> Series Template
+                    </button>
+                </div>
+            </div>
             
             <div class="import-export-section">
                 <button class="btn btn-info" id="exportBtn">
@@ -125,11 +184,19 @@
                 <button class="btn btn-primary" id="uploadBtn">
                     <i class="fas fa-upload"></i> Upload Backup
                 </button>
+                <button class="btn btn-secondary" id="importUrlBtn">
+                    <i class="fas fa-link"></i> Import from URL
+                </button>
             </div>
         </div>
         
         <footer>
             <p>ISP Media Hub &copy; 2023 | Your Local Media Directory</p>
+            <div class="keyboard-shortcuts">
+                <span><kbd>Ctrl</kbd> + <kbd>F</kbd> - Search</span>
+                <span><kbd>Ctrl</kbd> + <kbd>N</kbd> - New Server</span>
+                <span><kbd>Esc</kbd> - Cancel</span>
+            </div>
         </footer>
     </div>
 
@@ -152,6 +219,33 @@
                 </div>
                 <button class="btn btn-primary" id="copyData" style="width: 100%;">
                     <i class="fas fa-copy"></i> Copy to Clipboard
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import from URL Modal -->
+    <div class="modal" id="importUrlModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Import from URL</h3>
+                <button class="close-modal" id="closeUrlModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="importUrl">Server List URL</label>
+                    <input type="url" class="form-control" id="importUrl" placeholder="https://example.com/servers.json">
+                </div>
+                <div class="form-group">
+                    <label for="importMethod">
+                        <input type="radio" name="importMethod" value="replace" checked> Replace All
+                    </label>
+                    <label for="importMethod">
+                        <input type="radio" name="importMethod" value="merge"> Merge
+                    </label>
+                </div>
+                <button class="btn btn-success" id="confirmImportUrl" style="width: 100%;">
+                    <i class="fas fa-download"></i> Import from URL
                 </button>
             </div>
         </div>
@@ -180,6 +274,20 @@
                             <option value="non-bdix">Non-BDIX</option>
                         </select>
                     </div>
+                </div>
+                <div class="edit-modal-options">
+                    <div class="edit-option">
+                        <label>Tags:</label>
+                        <input type="text" class="form-control" id="editTags" placeholder="comma separated tags">
+                    </div>
+                    <div class="edit-option">
+                        <label>Usage Count:</label>
+                        <span id="editUsageCount">0</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Personal Notes:</label>
+                    <textarea class="form-control" id="editNotes" rows="3"></textarea>
                 </div>
                 <button class="btn btn-success" id="saveEdit" style="width: 100%;">
                     <i class="fas fa-save"></i> Save Changes
