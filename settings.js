@@ -43,10 +43,18 @@ function renderServerList(category) {
         listItem.setAttribute('data-id', server.id);
         
         listItem.innerHTML = `
-            <div class="server-rank-number">${index + 1}</div>
+            <div class="server-rank-number">${server.rank}</div>
             <div class="server-list-info">
-                <div class="server-list-name">${server.name}</div>
+                <div class="server-list-name">
+                    ${server.name}
+                    ${server.isFavorite ? '<i class="fas fa-star favorited" style="color: var(--warning); margin-left: 0.5rem;"></i>' : ''}
+                </div>
                 <div class="server-list-address">${server.address}</div>
+                ${server.tags && server.tags.length > 0 ? `
+                    <div class="server-list-tags">
+                        ${server.tags.map(tag => `<span class="server-tag">${tag}</span>`).join('')}
+                    </div>
+                ` : ''}
             </div>
             <div class="server-list-category">${getCategoryDisplayName(server.category)}</div>
             <div class="rank-controls">
@@ -76,57 +84,50 @@ function getCategoryDisplayName(category) {
 
 // Move server up in rank
 function moveServerUp(serverId) {
-    const serverIndex = servers.findIndex(s => s.id === serverId);
-    if (serverIndex === -1 || serverIndex === 0) return;
+    const server = servers.find(s => s.id === serverId);
+    if (!server) return;
     
-    // Get the current server and the one above it
-    const currentServer = servers[serverIndex];
-    const aboveServer = servers[serverIndex - 1];
+    const currentRank = server.rank;
+    if (currentRank <= 1) return;
     
-    // Swap ranks
-    const tempRank = currentServer.rank;
-    currentServer.rank = aboveServer.rank;
-    aboveServer.rank = tempRank;
-    
-    // Swap positions in the array
-    servers[serverIndex] = aboveServer;
-    servers[serverIndex - 1] = currentServer;
-    
-    saveServers();
-    renderServerList(currentCategory);
-    showToast('Server moved up!');
+    // Find the server with the previous rank
+    const prevServer = servers.find(s => s.rank === currentRank - 1);
+    if (prevServer) {
+        // Swap ranks
+        server.rank = currentRank - 1;
+        prevServer.rank = currentRank;
+        
+        saveServers();
+        renderServerList(currentCategory);
+        showToast('Server order updated!');
+    }
 }
 
 // Move server down in rank
 function moveServerDown(serverId) {
-    const serverIndex = servers.findIndex(s => s.id === serverId);
-    if (serverIndex === -1 || serverIndex === servers.length - 1) return;
+    const server = servers.find(s => s.id === serverId);
+    if (!server) return;
     
-    // Get the current server and the one below it
-    const currentServer = servers[serverIndex];
-    const belowServer = servers[serverIndex + 1];
+    const currentRank = server.rank;
+    const maxRank = servers.length;
     
-    // Swap ranks
-    const tempRank = currentServer.rank;
-    currentServer.rank = belowServer.rank;
-    belowServer.rank = tempRank;
+    if (currentRank >= maxRank) return;
     
-    // Swap positions in the array
-    servers[serverIndex] = belowServer;
-    servers[serverIndex + 1] = currentServer;
-    
-    saveServers();
-    renderServerList(currentCategory);
-    showToast('Server moved down!');
+    // Find the server with the next rank
+    const nextServer = servers.find(s => s.rank === currentRank + 1);
+    if (nextServer) {
+        // Swap ranks
+        server.rank = currentRank + 1;
+        nextServer.rank = currentRank;
+        
+        saveServers();
+        renderServerList(currentCategory);
+        showToast('Server order updated!');
+    }
 }
 
 // Save the new order
 function saveNewOrder() {
-    // Reassign ranks based on current order to ensure they're sequential
-    servers.forEach((server, index) => {
-        server.rank = index + 1;
-    });
-    
     saveServers();
     showToast('Server order saved successfully!');
 }
@@ -134,10 +135,9 @@ function saveNewOrder() {
 // Reset to default order (by name)
 function resetToDefaultOrder() {
     if (confirm('Are you sure you want to reset to alphabetical order?')) {
-        // Sort by name alphabetically
         servers.sort((a, b) => a.name.localeCompare(b.name));
         
-        // Update ranks based on new order
+        // Update ranks
         servers.forEach((server, index) => {
             server.rank = index + 1;
         });
