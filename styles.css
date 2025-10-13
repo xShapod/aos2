@@ -665,3 +665,25 @@ footer {
     opacity: 0.3;
     cursor: not-allowed;
 }
+
+/* === NEW IMPORT/EXPORT TEXTAREA STYLES === */
+.export-data:not([readonly]) {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid var(--primary) !important;
+}
+
+.export-data:focus {
+    outline: none;
+    border-color: var(--success) !important;
+    box-shadow: 0 0 0 2px rgba(76, 201, 240, 0.2) !important;
+}
+
+.export-data[readonly] {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.export-data:not([readonly]) {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--primary);
+}
