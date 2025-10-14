@@ -1,17 +1,69 @@
 let servers = [];
 let currentCategory = 'all';
+let sortable = null;
 
 // Load servers from localStorage
 document.addEventListener('DOMContentLoaded', function() {
     const savedServers = localStorage.getItem('ispServers');
     if (savedServers) {
         servers = JSON.parse(savedServers);
+        // Ensure all servers have a 'categories' array for filtering robustness
+        servers.forEach(server => {
+            if (!server.categories) {
+                server.categories = [server.category || 'others'];
+            }
+        });
     }
     
-    loadSettings();
     renderServerList(currentCategory);
     setupEventListeners();
+    initializeDragAndDrop();
 });
+
+// Initialize drag and drop functionality
+function initializeDragAndDrop() {
+    const serverList = document.getElementById('serverList');
+    
+    sortable = Sortable.create(serverList, {
+        animation: 150,
+        handle: '.server-list-item',
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
+        onEnd: function(evt) {
+            updateRanksAfterDrag();
+            showToast('Order updated! Don\'t forget to save.', 'warning');
+        }
+    });
+}
+
+// Update ranks after drag and drop
+function updateRanksAfterDrag() {
+    const serverList = document.getElementById('serverList');
+    const items = serverList.querySelectorAll('.server-list-item');
+    
+    items.forEach((item, index) => {
+        const serverId = parseInt(item.getAttribute('data-id'));
+        const server = servers.find(s => s.id === serverId);
+        if (server) {
+            server.rank = index + 1;
+        }
+    });
+    
+    // Update the displayed rank numbers
+    updateRankNumbers();
+}
+
+// Update displayed rank numbers
+function updateRankNumbers() {
+    const items = document.querySelectorAll('.server-list-item');
+    items.forEach((item, index) => {
+        const rankNumber = item.querySelector('.server-rank-number');
+        if (rankNumber) {
+            rankNumber.textContent = index + 1;
+        }
+    });
+}
 
 // Render server list for sorting
 function renderServerList(category) {
@@ -21,11 +73,9 @@ function renderServerList(category) {
     let filteredServers = servers;
     
     if (category !== 'all') {
-        if (category === 'favorites') {
-            filteredServers = servers.filter(server => server.isFavorite);
-        } else {
-            filteredServers = servers.filter(server => server.tags && server.tags.includes(category));
-        }
+        // Filter by checking if the server's categories array includes the selected category
+        // Ensure server.categories is treated as an array
+        filteredServers = servers.filter(server => server.categories && Array.isArray(server.categories) && server.categories.includes(category));
     }
     
     // Sort by current rank
@@ -47,24 +97,20 @@ function renderServerList(category) {
         listItem.className = 'server-list-item';
         listItem.setAttribute('data-id', server.id);
         
+        // Safely display the first category from the categories array
+        const primaryCategory = server.categories && server.categories.length > 0 ? server.categories[0] : 'others';
+
         listItem.innerHTML = `
             <div class="server-rank-number">${index + 1}</div>
             <div class="server-list-info">
-                <div class="server-list-name">
-                    ${server.name}
-                    ${server.isFavorite ? '<i class="fas fa-star favorited" style="color: var(--warning); margin-left: 0.5rem;"></i>' : ''}
-                </div>
+                <div class="server-list-name">${server.name}</div>
                 <div class="server-list-address">${server.address}</div>
-                ${server.tags && server.tags.length > 0 ? `
-                    <div class="server-list-tags">
-                        ${server.tags.map(tag => `<span class="server-tag">${tag}</span>`).join('')}
-                    </div>
-                ` : ''}
                 <div class="server-list-meta">
-                    <span>Used ${server.usageCount || 0} times</span>
-                    ${server.lastAccessed ? `<span>Last used: ${formatTimeAgo(server.lastAccessed)}</span>` : ''}
+                    <span class="server-type ${server.type}">${server.type === 'bdix' ? 'BDIX' : 'Non-BDIX'}</span>
+                    ${server.lastResponseTime ? `<span class="response-time">${server.lastResponseTime}ms</span>` : ''}
                 </div>
             </div>
+            <div class="server-list-category">${getCategoryDisplayName(primaryCategory)}</div>
             <div class="rank-controls">
                 <button class="rank-btn" onclick="moveServerUp(${server.id})" ${index === 0 ? 'disabled' : ''}>
                     <i class="fas fa-arrow-up"></i>
@@ -79,47 +125,69 @@ function renderServerList(category) {
     });
 }
 
-// Move server up in rank
-function moveServerUp(serverId) {
-    const serverIndex = servers.findIndex(s => s.id === serverId);
-    if (serverIndex === -1 || serverIndex === 0) return;
+// Get display name for category
+function getCategoryDisplayName(category) {
+    const categories = {
+        'live': 'Live TV',
+        'movies': 'Movies',
+        'series': 'Series',
+        'others': 'Others'
+    };
+    return categories[category] || category;
+}
+
+// Move server up in the current filtered list (manual rank order only)
+function moveServerUp(id) {
+    // We only modify the global 'servers' array, so we need to find the full server object.
+    const currentServer = servers.find(server => server.id === id);
+    if (!currentServer) return;
+
+    // Filter and sort the servers based on the current category and rank order to find the neighbor
+    let filteredServers = servers;
+    if (currentCategory !== 'all') {
+        filteredServers = servers.filter(server => server.categories && Array.isArray(server.categories) && server.categories.includes(currentCategory));
+    }
+    filteredServers.sort((a, b) => a.rank - b.rank);
     
-    // Get the current server and the one above it
-    const currentServer = servers[serverIndex];
-    const aboveServer = servers[serverIndex - 1];
+    const filteredIndex = filteredServers.findIndex(server => server.id === id);
+    if (filteredIndex === 0 || filteredIndex === -1) return; // Cannot move up
     
-    // Swap ranks
+    const aboveServer = filteredServers[filteredIndex - 1];
+
+    // Swap ranks between the two servers in the *global* list
     const tempRank = currentServer.rank;
     currentServer.rank = aboveServer.rank;
     aboveServer.rank = tempRank;
     
-    // Swap positions in the array
-    servers[serverIndex] = aboveServer;
-    servers[serverIndex - 1] = currentServer;
-    
+    // Note: The move is only in rank, not array position. The next render will reflect the change.
     saveServers();
     renderServerList(currentCategory);
     showToast('Server moved up!');
 }
 
-// Move server down in rank
-function moveServerDown(serverId) {
-    const serverIndex = servers.findIndex(s => s.id === serverId);
-    if (serverIndex === -1 || serverIndex === servers.length - 1) return;
+// Move server down in the current filtered list (manual rank order only)
+function moveServerDown(id) {
+    const currentServer = servers.find(server => server.id === id);
+    if (!currentServer) return;
     
-    // Get the current server and the one below it
-    const currentServer = servers[serverIndex];
-    const belowServer = servers[serverIndex + 1];
+    // Filter and sort the servers based on the current category and rank order to find the neighbor
+    let filteredServers = servers;
+    if (currentCategory !== 'all') {
+        filteredServers = servers.filter(server => server.categories && Array.isArray(server.categories) && server.categories.includes(currentCategory));
+    }
+    filteredServers.sort((a, b) => a.rank - b.rank);
     
-    // Swap ranks
+    const filteredIndex = filteredServers.findIndex(server => server.id === id);
+    if (filteredIndex === filteredServers.length - 1 || filteredIndex === -1) return; // Cannot move down
+    
+    const belowServer = filteredServers[filteredIndex + 1];
+
+    // Swap ranks between the two servers in the *global* list
     const tempRank = currentServer.rank;
     currentServer.rank = belowServer.rank;
     belowServer.rank = tempRank;
     
-    // Swap positions in the array
-    servers[serverIndex] = belowServer;
-    servers[serverIndex + 1] = currentServer;
-    
+    // Note: The move is only in rank, not array position. The next render will reflect the change.
     saveServers();
     renderServerList(currentCategory);
     showToast('Server moved down!');
@@ -128,18 +196,27 @@ function moveServerDown(serverId) {
 // Save the new order
 function saveNewOrder() {
     // Reassign ranks based on current order to ensure they're sequential
-    servers.forEach((server, index) => {
+    // This is important after drag/drop or repeated moves to clean up the ranks
+    let currentFilteredServers = servers;
+    if (currentCategory !== 'all') {
+        currentFilteredServers = servers.filter(server => server.categories && Array.isArray(server.categories) && server.categories.includes(currentCategory));
+    }
+    currentFilteredServers.sort((a, b) => a.rank - b.rank);
+    
+    // Reassign sequential ranks only to the filtered list
+    currentFilteredServers.forEach((server, index) => {
         server.rank = index + 1;
     });
-    
+
+    // Re-save the entire list to ensure consistency
     saveServers();
     showToast('Server order saved successfully!');
 }
 
 // Reset to default order (by name)
 function resetToDefaultOrder() {
-    if (confirm('Are you sure you want to reset to alphabetical order?')) {
-        // Sort by name alphabetically
+    if (confirm('Are you sure you want to reset the order to alphabetical for all servers?')) {
+        // Sort the entire list by name alphabetically
         servers.sort((a, b) => a.name.localeCompare(b.name));
         
         // Update ranks based on new order
@@ -151,91 +228,6 @@ function resetToDefaultOrder() {
         renderServerList(currentCategory);
         showToast('Order reset to alphabetical!');
     }
-}
-
-// Clear usage statistics
-function clearUsageStats() {
-    if (confirm('Are you sure you want to clear all usage statistics? This cannot be undone.')) {
-        servers.forEach(server => {
-            server.usageCount = 0;
-            server.lastAccessed = null;
-            server.responseTime = null;
-            server.lastTested = null;
-        });
-        
-        saveServers();
-        renderServerList(currentCategory);
-        showToast('Usage statistics cleared!');
-    }
-}
-
-// Create backup
-function createBackup() {
-    const backup = {
-        servers: servers,
-        timestamp: Date.now(),
-        version: '2.0'
-    };
-    
-    const dataStr = JSON.stringify(backup, null, 2);
-    const dataBlob = new Blob([dataStr], {type: 'application/json'});
-    
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `isp-servers-backup-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    showToast('Backup created successfully!');
-}
-
-// Clear all data
-function clearAllData() {
-    if (confirm('⚠️ DANGER ZONE! This will delete ALL your servers and settings. This cannot be undone!')) {
-        if (prompt('Type "DELETE ALL" to confirm:') === 'DELETE ALL') {
-            localStorage.removeItem('ispServers');
-            localStorage.removeItem('appSettings');
-            servers = [];
-            showToast('All data cleared!', 'error');
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 2000);
-        }
-    }
-}
-
-// Load settings
-function loadSettings() {
-    const savedSettings = localStorage.getItem('appSettings');
-    if (savedSettings) {
-        const settings = JSON.parse(savedSettings);
-        
-        // Apply settings to form elements
-        document.getElementById('backupFrequency').value = settings.backupFrequency || 'disabled';
-        document.getElementById('backupRetention').value = settings.backupRetention || '7';
-        document.getElementById('darkMode').checked = settings.darkMode !== false;
-        document.getElementById('compactView').checked = settings.compactView || false;
-        document.getElementById('autoTest').checked = settings.autoTest !== false;
-        document.getElementById('showUsageStats').checked = settings.showUsageStats !== false;
-    }
-}
-
-// Save settings
-function saveSettings() {
-    const settings = {
-        backupFrequency: document.getElementById('backupFrequency').value,
-        backupRetention: document.getElementById('backupRetention').value,
-        darkMode: document.getElementById('darkMode').checked,
-        compactView: document.getElementById('compactView').checked,
-        autoTest: document.getElementById('autoTest').checked,
-        showUsageStats: document.getElementById('showUsageStats').checked
-    };
-    
-    localStorage.setItem('appSettings', JSON.stringify(settings));
-    showToast('Settings saved!');
 }
 
 // Set up event listeners for settings page
@@ -260,36 +252,16 @@ function setupEventListeners() {
     
     // Reset order button
     document.getElementById('resetOrder').addEventListener('click', resetToDefaultOrder);
-    
-    // Clear stats button
-    document.getElementById('clearStats').addEventListener('click', clearUsageStats);
-    
-    // Backup buttons
-    document.getElementById('createBackup').addEventListener('click', createBackup);
-    document.getElementById('clearData').addEventListener('click', clearAllData);
-    
-    // Settings change listeners
-    document.querySelectorAll('select, input').forEach(element => {
-        element.addEventListener('change', saveSettings);
-    });
-}
-
-// Utility function
-function formatTimeAgo(timestamp) {
-    const now = Date.now();
-    const diff = now - timestamp;
-    
-    if (diff < 60000) return 'just now';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-    return `${Math.floor(diff / 86400000)}d ago`;
 }
 
 // Show toast notification
 function showToast(message, type = 'success') {
     const toast = document.getElementById('toast');
     toast.textContent = message;
-    toast.style.background = type === 'error' ? 'var(--danger)' : 'var(--success)';
+    // MODIFIED: Check for 'warning' and set background accordingly
+    toast.style.background = type === 'error' ? 'var(--danger)' : (type === 'warning' ? 'var(--warning)' : 'var(--success)');
+    // MODIFIED: Set text color for better contrast on warnings
+    toast.style.color = type === 'warning' ? 'var(--dark)' : 'white';
     toast.classList.add('show');
     
     setTimeout(() => {
